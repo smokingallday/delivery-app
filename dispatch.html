@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dispatch Command | Home Base</title>
+
+  <!-- Core Libraries -->
+  <script src="xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!-- Firebase Cloud Sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b1329; --sidebar: #111e38; --card: #17264a; --border: #293b66;
+      --accent: #38bdf8; --primary: #2563eb; --success: #16a34a; --warning: #f59e0b;
+      --danger: #ef4444; --text: #f8fafc; --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    
+    header {
+      background: #090e1f;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+    header .status-pill {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .main-layout { display: grid; grid-template-columns: 420px 1fr; flex: 1; height: calc(100vh - 65px); }
+
+    /* Left Panel: Intake */
+    .sidebar-intake {
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .sidebar-intake h2 { font-size: 1.1rem; margin-bottom: 16px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+
+    .upload-zone {
+      border: 2px dashed var(--accent);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 18px;
+      background: rgba(56, 189, 248, 0.05);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .upload-zone:hover { background: rgba(56, 189, 248, 0.1); }
+    .upload-zone input { display: none; }
+
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; margin-top: 12px; text-transform: uppercase; font-weight: 600; }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: #090e1f;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    .dims-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      background: var(--accent);
+      color: #0b1329;
+      font-size: 0.95rem;
+      transition: filter 0.2s;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn-export { background: #0284c7; color: #fff; width: auto; padding: 8px 16px; margin: 0; }
+    .btn-clear { background: #334155; color: #cbd5e1; width: auto; padding: 8px 16px; margin: 0; }
+
+    .alert { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-top: 12px; display: none; }
+    .alert-danger { background: rgba(220, 38, 38, 0.2); color: #fca5a5; border: 1px solid var(--danger); }
+    .alert-success { background: rgba(22, 163, 74, 0.2); color: #86efac; border: 1px solid var(--success); }
+
+    /* Right Panel: Live Fleet Queue */
+    .content-queue { padding: 24px 32px; overflow-y: auto; }
+    .queue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .queue-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .toolbar { display: flex; gap: 10px; }
+
+    .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .order-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .order-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+    .badge-pending { background: #78350f; color: #fde68a; }
+    .badge-intransit { background: #1e3a8a; color: #93c5fd; }
+    .badge-delivered { background: #14532d; color: #86efac; }
+    .badge-oversize { background: #7f1d1d; color: #fecaca; border: 1px solid var(--danger); margin-top: 6px; font-size: 0.7rem; }
+
+    .pod-box {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .pod-box img { width: 55px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Borray Dispatch Command</h1>
+    <div class="status-pill">● Live Fleet Sync Connected</div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Left Section: Intake Desk -->
+    <aside class="sidebar-intake">
+      <h2>📝 Book New Delivery</h2>
+
+      <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <strong>Upload Packing Slip / Invoice</strong>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">PDF, XLSX, or CSV supported</p>
+        <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload(event)">
+      </div>
+
+      <form id="deliveryForm" onsubmit="event.preventDefault(); handleAddOrder();">
+        <label>PO / Invoice Number</label>
+        <input type="text" id="poNumber" placeholder="PO-1001" required>
+
+        <label>Customer Name</label>
+        <input type="text" id="customerName" placeholder="Client / Store Name" required>
+
+        <label>Destination Address</label>
+        <input type="text" id="deliveryAddress" placeholder="Street, City, State, ZIP" required>
+
+        <label>Cargo Dimensions (Inches)</label>
+        <div class="dims-grid">
+          <input type="number" id="dimL" placeholder="L (68 max)" step="any" oninput="auditIoniqLimits()" required>
+          <input type="number" id="dimW" placeholder="W (41 max)" step="any" oninput="auditIoniqLimits()" required>
+          <input type="number" id="dimH" placeholder="H (26 max)" step="any" oninput="auditIoniqLimits()" required>
+        </div>
+        <div id="dimAlert" class="alert alert-danger">
+          ⚠️ OVERSIZE (Exceeds IONIQ 5 bed: 68"L × 41"W × 26"H, 59.3 cu ft)
+        </div>
+
+        <label>Special Instructions / Notes</label>
+        <textarea id="itemsDesc" rows="2" placeholder="Gate codes, delivery contact..."></textarea>
+
+        <button type="submit" class="btn">Dispatch to Driver Phone</button>
+      </form>
+      <div id="intakeAlert" class="alert alert-success"></div>
+    </aside>
+
+    <!-- Right Section: Fleet Live Monitor -->
+    <main class="content-queue">
+      <div class="queue-header">
+        <div>
+          <h2 class="queue-title">Active Fleet Monitor</h2>
+          <span style="font-size: 0.85rem; color: var(--muted);">Real-time status tracking and Proof of Delivery review</span>
+        </div>
+        <div class="toolbar">
+          <button class="btn-export" onclick="exportDailyManifest()">📊 Export Manifest</button>
+          <button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
+        </div>
+      </div>
+
+      <div id="orders-list" class="orders-grid"></div>
+    </main>
+  </div>
+
+  <script>
+    // --- FIREBASE CONFIGURATION ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyCes7q2ekpluK_QBpcDPb6iaIxljDQZ5dY",
+      authDomain: "borray-delivery-dispatch.firebaseapp.com",
+      projectId: "borray-delivery-dispatch",
+      storageBucket: "borray-delivery-dispatch.firebasestorage.app",
+      messagingSenderId: "385282448736",
+      appId: "1:385282448736:web:a8e60e605c20c0a7229205",
+      measurementId: "G-N1TG2E7RMB"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const IONIQ5_LIMITS = { maxL: 68, maxW: 41, maxH: 26, maxCuFt: 59.3 };
+    let currentOrders = [];
+
+    function resolvePdfLib() {
+      if (window.pdfjsLib) return window.pdfjsLib;
+      if (window['pdfjs-dist/build/pdf']) return window['pdfjs-dist/build/pdf'];
+      if (window.PDFJS) return window.PDFJS;
+      return null;
+    }
+
+    function checkIsOversize(l, w, h) {
+      const cuFt = (l * w * h) / 1728;
+      return (l > IONIQ5_LIMITS.maxL || w > IONIQ5_LIMITS.maxW || h > IONIQ5_LIMITS.maxH || cuFt > IONIQ5_LIMITS.maxCuFt);
+    }
+
+    window.auditIoniqLimits = function() {
+      const l = parseFloat(document.getElementById('dimL').value) || 0;
+      const w = parseFloat(document.getElementById('dimW').value) || 0;
+      const h = parseFloat(document.getElementById('dimH').value) || 0;
+      const alertBox = document.getElementById('dimAlert');
+      if (!l && !w && !h) {
+        alertBox.style.display = 'none';
+        return false;
+      }
+      const isOver = checkIsOversize(l, w, h);
+      alertBox.style.display = isOver ? 'block' : 'none';
+      return isOver;
+    };
+
+    // Intake Parsing
+    window.handleFileUpload = async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const nameLower = file.name.toLowerCase();
+
+      if (file.type === "application/pdf" || nameLower.endsWith('.pdf')) {
+        let pdfLib = resolvePdfLib();
+        if (!pdfLib) {
+          await new Promise(r => setTimeout(r, 300));
+          pdfLib = resolvePdfLib();
+        }
+        if (!pdfLib) {
+          alert("PDF library is still initializing. Please select the file again.");
+          return;
+        }
+        if (!pdfLib.GlobalWorkerOptions.workerSrc) {
+          pdfLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js";
+        }
+        try {
+          const buf = await file.arrayBuffer();
+          const pdf = await pdfLib.getDocument({ data: new Uint8Array(buf) }).promise;
+          let fullText = "";
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            fullText += content.items.map(it => it.str).join(" ") + " ";
+          }
+          extractFieldsFromText(fullText, file.name);
+        } catch (err) {
+          alert("Error parsing PDF: " + err.message);
+        }
+      } else if (nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls') || nameLower.endsWith('.csv')) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const txt = XLSX.utils.sheet_to_txt(ws);
+            extractFieldsFromText(txt, file.name);
+          } catch (err) {
+            alert("Error parsing spreadsheet: " + err.message);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    };
+
+    function extractFieldsFromText(text, filename) {
+      let invMatch = text.match(/Invoice\s*([0-9]+(?:-[0-9]+)?)/i);
+      let poMatch = text.match(/(?:P\.O\.?\s*NUMBER|PO|P\.O\.|Order)[\s#:*-]+([A-Za-z0-9-]+)/i);
+      let finalPO = '';
+      if (invMatch) finalPO = invMatch[1].trim();
+      else if (poMatch && poMatch[1].trim().toUpperCase() !== 'NUMBER') finalPO = poMatch[1].trim();
+      else finalPO = 'PO-' + Date.now().toString().slice(-6);
+
+      let customerName = '';
+      let deliveryAddress = '';
+
+      const billToMatch = text.match(/BILL\s*TO[\s:]+([\s\S]+?)(?=\s+DATE|\s+PLEASE\s+PAY|\s+DUE\s+DATE|\s+CUSTOM|$)/i);
+      if (billToMatch) {
+        let block = billToMatch[1].trim();
+        const addrRegex = /([0-9]+\s+[A-Za-z0-9\s,\.]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|BOULEVARD|DR|DRIVE|LN|LANE|WAY|CT|COURT)[\s\S]*?[0-9]{5}(?:-[0-9]{4})?)/i;
+        const addrFound = block.match(addrRegex);
+        if (addrFound) {
+          deliveryAddress = addrFound[1].replace(/\s+/g, ' ').trim();
+          customerName = block.substring(0, addrFound.index).replace(/\s+/g, ' ').trim();
+        } else {
+          let parts = block.split(/\s{2,}/);
+          customerName = parts[0] || '';
+          deliveryAddress = parts.slice(1).join(' ').trim();
+        }
+      }
+
+      let dimL = '', dimW = '', dimH = '';
+      const dim3D = text.match(/(\d+(?:\.\d+)?)\s*["”]?\s*[xX*by\s]+\s*(\d+(?:\.\d+)?)\s*["”]?\s*[xX*by\s]+\s*(\d+(?:\.\d+)?)/i);
+      const dim2D = text.match(/(\d+(?:\.\d+)?)\s*["”]?\s*[xX*by\s]+\s*(\d+(?:\.\d+)?)\s*["”]?/i);
+      if (dim3D) { dimL = dim3D[1]; dimW = dim3D[2]; dimH = dim3D[3]; }
+      else if (dim2D) { dimL = dim2D[1]; dimW = dim2D[2]; dimH = '12'; }
+
+      if (document.getElementById('poNumber')) document.getElementById('poNumber').value = finalPO;
+      if (document.getElementById('customerName')) document.getElementById('customerName').value = customerName;
+      if (document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = deliveryAddress;
+      if (document.getElementById('dimL')) document.getElementById('dimL').value = dimL;
+      if (document.getElementById('dimW')) document.getElementById('dimW').value = dimW;
+      if (document.getElementById('dimH')) document.getElementById('dimH').value = dimH;
+
+      document.getElementById('itemsDesc').value = "Parsed from: " + filename;
+      auditIoniqLimits();
+    }
+
+    // Save and Dispatch
+    window.handleAddOrder = async function() {
+      const l = parseFloat(document.getElementById('dimL').value) || 0;
+      const w = parseFloat(document.getElementById('dimW').value) || 0;
+      const h = parseFloat(document.getElementById('dimH').value) || 0;
+      const cuFt = ((l * w * h) / 1728).toFixed(1);
+      const orderId = 'ord_' + Date.now();
+
+      const newOrder = {
+        id: orderId,
+        poNumber: document.getElementById('poNumber').value.trim(),
+        customer: document.getElementById('customerName').value.trim(),
+        destination: document.getElementById('deliveryAddress').value.trim(),
+        length: l,
+        width: w,
+        height: h,
+        cubicFt: cuFt,
+        isOversize: checkIsOversize(l, w, h),
+        status: 'Pending',
+        photoData: null,
+        signatureData: null,
+        signerName: '',
+        deliveredAt: null,
+        notes: document.getElementById('itemsDesc').value.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      await db.collection('orders').doc(orderId).set(newOrder);
+
+      document.getElementById('deliveryForm').reset();
+      document.getElementById('dimAlert').style.display = 'none';
+
+      const alertBox = document.getElementById('intakeAlert');
+      alertBox.textContent = "✓ Order " + newOrder.poNumber + " dispatched to driver.";
+      alertBox.style.display = 'block';
+      setTimeout(() => alertBox.style.display = 'none', 3000);
+    };
+
+    // Live Snapshot Listener
+    function listenToOrders() {
+      db.collection('orders').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+        currentOrders = [];
+        snapshot.forEach(doc => currentOrders.push(doc.data()));
+
+        const listEl = document.getElementById('orders-list');
+        if (currentOrders.length === 0) {
+          listEl.innerHTML = '<div style="color: var(--muted); grid-column: 1/-1;">No deliveries logged. Enter details on the left to dispatch.</div>';
+          return;
+        }
+
+        listEl.innerHTML = currentOrders.map(ord => {
+          const normStatus = ord.status.replace(/\s+/g, '').toLowerCase();
+          let podSection = '';
+          if (ord.status === 'Delivered') {
+            podSection = 
+              '<div class="pod-box">' +
+                (ord.photoData ? '<img src="' + ord.photoData + '" alt="POD">' : '') +
+                (ord.signatureData ? '<img src="' + ord.signatureData + '" alt="Sig" style="background:#fff;">' : '') +
+                '<div style="font-size:0.75rem; color:var(--muted);">' +
+                  'Received by: <strong>' + (ord.signerName || 'N/A') + '</strong><br>' +
+                  new Date(ord.deliveredAt).toLocaleTimeString() +
+                '</div>' +
+              '</div>';
+          }
+
+          return (
+            '<div class="order-card">' +
+              '<div>' +
+                '<div class="order-top">' +
+                  '<strong style="font-size:1.1rem; color:#fff;">' + ord.poNumber + '</strong>' +
+                  '<span class="badge badge-' + normStatus + '">' + ord.status + '</span>' +
+                '</div>' +
+                '<div style="color:var(--accent); font-weight:600; font-size:0.95rem;">' + ord.customer + '</div>' +
+                '<p style="font-size:0.85rem; color:var(--text); margin-top:6px;">📍 ' + ord.destination + '</p>' +
+                '<p style="font-size:0.8rem; color:var(--muted); margin-top:4px;">' +
+                  ord.length + '"L × ' + ord.width + '"W × ' + ord.height + '"H (' + ord.cubicFt + ' cu ft)' +
+                '</p>' +
+                (ord.isOversize ? '<div class="badge badge-oversize">⚠️ OVERSIZE FOR IONIQ 5</div>' : '') +
+                (ord.notes ? '<p style="font-size:0.8rem; color:var(--muted); margin-top:6px; font-style:italic;">Notes: ' + ord.notes + '</p>' : '') +
+              '</div>' +
+              podSection +
+            '</div>'
+          );
+        }).join('');
+      });
+    }
+
+    // Manifest Download
+    window.exportDailyManifest = function() {
+      if (!currentOrders.length) {
+        alert("No orders to export.");
+        return;
+      }
+      const rows = currentOrders.map(o => ({
+        "PO / Invoice #": o.poNumber,
+        "Customer": o.customer,
+        "Destination Address": o.destination,
+        "Dimensions": o.length + '" × ' + o.width + '" × ' + o.height + '"',
+        "Cubic Feet": o.cubicFt,
+        "Status": o.status,
+        "Signer Name": o.signerName || "N/A",
+        "Delivered Timestamp": o.deliveredAt ? new Date(o.deliveredAt).toLocaleString() : "N/A"
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Dispatch Manifest");
+      XLSX.writeFile(wb, "dispatch-manifest-" + new Date().toISOString().slice(0, 10) + ".xlsx");
+    };
+
+    window.clearCompletedDeliveries = async function() {
+      if (!confirm("Clear all delivered orders from the active fleet screen?")) return;
+      const batch = db.batch();
+      currentOrders.forEach(o => {
+        if (o.status === 'Delivered') {
+          batch.delete(db.collection('orders').doc(o.id));
+        }
+      });
+      await batch.commit();
+    };
+
+    window.addEventListener('DOMContentLoaded', listenToOrders);
+  </script>
+</body>
+</html>

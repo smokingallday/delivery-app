@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sync Test</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { background: #0f172a; color: #f8fafc; font-family: sans-serif; padding: 20px; }
+    .log { background: #020617; padding: 12px; border-radius: 6px; font-family: monospace; }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h2>⚡ Borray Live Sync Diagnostic</h2>
+  <div id="log" class="log">Testing connection...</div>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCes7q2ekpluK_QBpcDPb6iaIxljDQZ5dY",
+      authDomain: "borray-delivery-dispatch.firebaseapp.com",
+      projectId: "borray-delivery-dispatch",
+      storageBucket: "borray-delivery-dispatch.firebasestorage.app",
+      messagingSenderId: "385282448736",
+      appId: "1:385282448736:web:a8e60e605c20c0a7229205"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const out = document.getElementById('log');
+
+    const testId = 'TEST-' + Math.floor(Math.random() * 9000 + 1000);
+    db.collection('orders').doc(testId).set({
+      poNumber: testId,
+      customer: "Cloud Test Ping",
+      createdAt: new Date().toISOString()
+    }).then(() => {
+      out.innerHTML = `<span class="success">✔ CLOUD CONNECTION CONFIRMED!</span><br>Document <strong>${testId}</strong> written to Firestore.`;
+    }).catch(err => {
+      out.innerHTML = `<span class="error">✖ Error: ${err.message}</span>`;
+    });
+  </script>
+</body>
+</html>
