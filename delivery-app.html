@@ -76,7 +76,7 @@
   <section id="screen-queue" class="screen active">
     <div class="toolbar">
       <button class="btn-export" onclick="exportDailyManifest()">📊 Export Daily Manifest</button>
-      <button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
+      <button class="btn-clear" onclick="openRestore()">↩️ Restore (<span id="tCnt">0</span>)</button><button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
     </div>
     <div id="orders-list"></div>
   </section>
@@ -445,7 +445,7 @@
               '</p>' +
               (order.isOversize ? '<span class="badge badge-oversize">⚠️ OVERSIZE / EXCEEDS IONIQ 5 CAPACITY</span>' : '') +
               '<div style="display:flex; gap:8px; margin-top:10px;">' +
-                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' +
+                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' + '<button type="button" class="btn btn-secondary" style="margin-top:0;color:#ef4444;border-color:#ef4444;padding:6px 10px;" onclick="delOrd(' + JSON.stringify(order.id) + ')">🗑️</button>' +
                 '<div style="flex:1;">' + actionButtons + '</div>' +
               '</div>' +
               thumbnailsHtml +
@@ -580,5 +580,5 @@
       listenToDispatchQueue();
     });
   </script>
-</body>
+<script src="trash.js"></script></body>
 </html>
