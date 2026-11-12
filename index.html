@@ -576,6 +576,16 @@
       switchTab('screen-queue');
     };
 
+    window.delOrd = async function(orderId) {
+      if (!orderId) return;
+      if (!confirm("Delete this order permanently?")) return;
+      try {
+        await db.collection('orders').doc(orderId).delete();
+      } catch (err) {
+        alert("Error deleting order: " + err.message);
+      }
+    };
+
     window.addEventListener('DOMContentLoaded', () => {
       listenToDispatchQueue();
     });
