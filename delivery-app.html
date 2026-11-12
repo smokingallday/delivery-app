@@ -399,7 +399,7 @@
     function listenToDispatchQueue() {
       db.collection('orders').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
         currentOrders = [];
-        snapshot.forEach(doc => currentOrders.push(doc.data()));
+        snapshot.forEach(doc => currentOrders.push({ ...doc.data(), id: doc.id }));
 
         const listEl = document.getElementById('orders-list');
         if (!currentOrders || currentOrders.length === 0) {
