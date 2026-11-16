@@ -191,7 +191,7 @@
         </div>
         <div class="toolbar">
           <button class="btn-export" onclick="exportDailyManifest()">📊 Export Manifest</button>
-          <button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
+          <button class="btn-clear" style="background:#1e3a8a;color:#93c5fd;" onclick="openRestore()">↩️ Restore (<span id="tCnt">0</span>)</button><button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
         </div>
       </div>
 
@@ -415,6 +415,9 @@
                 (ord.notes ? '<p style="font-size:0.8rem; color:var(--muted); margin-top:6px; font-style:italic;">Notes: ' + ord.notes + '</p>' : '') +
               '</div>' +
               podSection +
+              '<div style="margin-top:10px;text-align:right;">' +
+                '<button type="button" style="background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;padding:5px 10px;border-radius:5px;font-size:0.75rem;cursor:pointer;" onclick="delOrd(\'' + ord.id + '\')">🗑️ Delete</button>' +
+              '</div>' +
             '</div>'
           );
         }).join('');
@@ -456,5 +459,5 @@
 
     window.addEventListener('DOMContentLoaded', listenToOrders);
   </script>
-</body>
+<script src="trash.js"></script></body>
 </html>

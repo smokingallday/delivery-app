@@ -445,7 +445,7 @@
               '</p>' +
               (order.isOversize ? '<span class="badge badge-oversize">⚠️ OVERSIZE / EXCEEDS IONIQ 5 CAPACITY</span>' : '') +
               '<div style="display:flex; gap:8px; margin-top:10px;">' +
-                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' + '<button type="button" class="btn btn-secondary" style="margin-top:0;color:#ef4444;border-color:#ef4444;padding:6px 10px;" onclick="delOrd(' + JSON.stringify(order.id) + ')">🗑️</button>' +
+                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' + '<button type="button" class="btn btn-secondary" style="margin-top:0;color:#ef4444;border-color:#ef4444;padding:6px 10px;" onclick="delOrd(\'' + order.id + '\')">🗑️</button>' +
                 '<div style="flex:1;">' + actionButtons + '</div>' +
               '</div>' +
               thumbnailsHtml +
