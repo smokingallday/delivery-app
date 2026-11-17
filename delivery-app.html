@@ -76,7 +76,7 @@
   <section id="screen-queue" class="screen active">
     <div class="toolbar">
       <button class="btn-export" onclick="exportDailyManifest()">📊 Export Daily Manifest</button>
-      <button class="btn-clear" onclick="openRestore()">↩️ Restore (<span id="tCnt">0</span>)</button><button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
+      <button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
     </div>
     <div id="orders-list"></div>
   </section>
@@ -87,7 +87,7 @@
       <h2 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--accent);">Book Delivery Order</h2>
       <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
         <strong>Upload Slip (PDF, XLSX, CSV)</strong>
-        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--muted);">Auto-extracts PO#, Customer, & Dimensions</p>
+        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--muted);">Auto-extracts PO#, Ship To / Shipper, & Dimensions</p>
         <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload(event)">
       </div>
       <form id="deliveryForm" onsubmit="event.preventDefault(); handleAddOrder();">
@@ -140,7 +140,6 @@
   </nav>
 
   <script>
-    // --- 1. FIREBASE INITIALIZATION & OFFLINE PERSISTENCE ---
     const firebaseConfig = {
       apiKey: "AIzaSyCes7q2ekpluK_QBpcDPb6iaIxljDQZ5dY",
       authDomain: "borray-delivery-dispatch.firebaseapp.com",
@@ -154,7 +153,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Enable offline persistence so cards stay loaded without cell reception
     db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
       console.warn("Firestore offline persistence notice:", err.code);
     });
@@ -171,7 +169,6 @@
       return null;
     }
 
-    // --- 2. GLOBAL NAVIGATION & EXPORT ---
     window.switchTab = function(screenId) {
       document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -221,7 +218,6 @@
       await batch.commit();
     };
 
-    // --- 3. VEHICLE LIMITS & AUDITING ---
     function checkIsOversize(l, w, h) {
       const cuFt = (l * w * h) / 1728;
       return (l > IONIQ5_LIMITS.maxL || w > IONIQ5_LIMITS.maxW || h > IONIQ5_LIMITS.maxH || cuFt > IONIQ5_LIMITS.maxCuFt);
@@ -241,7 +237,6 @@
       return isOver;
     };
 
-    // --- 4. PARSER & INTAKE ---
     window.handleFileUpload = async function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -291,7 +286,7 @@
     };
 
     function extractFieldsFromText(text, filename) {
-      let invMatch = text.match(/Invoice\s*([0-9]+(?:-[0-9]+)?)/i);
+      let invMatch = text.match(/Invoice\s*#?\s*([0-9]+(?:-[0-9]+)?)/i);
       let poMatch = text.match(/(?:P\.O\.?\s*NUMBER|PO|P\.O\.|Order)[\s#:*-]+([A-Za-z0-9-]+)/i);
       let finalPO = '';
       if (invMatch) {
@@ -306,10 +301,11 @@
       let customerName = '';
       let deliveryAddress = '';
 
-      const billToMatch = text.match(/BILL\s*TO[\s:]+([\s\S]+?)(?=\s+DATE|\s+PLEASE\s+PAY|\s+DUE\s+DATE|\s+CUSTOM|$)/i);
-      if (billToMatch) {
-        let block = billToMatch[1].trim();
-        const addrRegex = /([0-9]+\s+[A-Za-z0-9\s,\.]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|BOULEVARD|DR|DRIVE|LN|LANE|WAY|CT|COURT)[\s\S]*?[0-9]{5}(?:-[0-9]{4})?)/i;
+      // Extract from SHIP TO or SHIPPER block instead of BILL TO
+      const shipMatch = text.match(/(?:SHIP\s*TO|SHIPPER)[\s:]+([\s\S]+?)(?=\s+BILL\s*TO|\s+DATE|\s+PLEASE\s+PAY|\s+DUE\s+DATE|\s+P\.O|\s+INVOICE|\s+CUSTOM|\s+QTY|$)/i);
+      if (shipMatch) {
+        let block = shipMatch[1].trim();
+        const addrRegex = /([0-9]+\s+[A-Za-z0-9\s,\.#-]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|BOULEVARD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PKWY|PARKWAY|HWY|HIGHWAY)[\s\S]*?[0-9]{5}(?:-[0-9]{4})?)/i;
         const addrFound = block.match(addrRegex);
 
         if (addrFound) {
@@ -324,7 +320,7 @@
       }
 
       if (!deliveryAddress) {
-        const fallbackAddr = text.match(/([0-9]+\s+[A-Za-z0-9\s,\.]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|DR|LN|WAY)[\s\S]*?[0-9]{5})/i);
+        const fallbackAddr = text.match(/([0-9]+\s+[A-Za-z0-9\s,\.#-]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|DR|LN|WAY)[\s\S]*?[0-9]{5})/i);
         if (fallbackAddr) deliveryAddress = fallbackAddr[1].replace(/\s+/g, ' ').trim();
       }
 
@@ -375,7 +371,6 @@
         createdAt: new Date().toISOString()
       };
 
-      // Push to Firestore Cloud (syncs to phone automatically)
       await db.collection('orders').doc(orderId).set(newOrder);
 
       document.getElementById('deliveryForm').reset();
@@ -391,7 +386,6 @@
       }, 500);
     };
 
-    // --- 5. REAL-TIME CLOUD LISTENER & QUEUE RENDER ---
     window.updateOrderStatus = async function(orderId, newStatus) {
       await db.collection('orders').doc(orderId).update({ status: newStatus });
     };
@@ -399,7 +393,7 @@
     function listenToDispatchQueue() {
       db.collection('orders').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
         currentOrders = [];
-        snapshot.forEach(doc => currentOrders.push({ ...doc.data(), id: doc.id }));
+        snapshot.forEach(doc => currentOrders.push(doc.data()));
 
         const listEl = document.getElementById('orders-list');
         if (!currentOrders || currentOrders.length === 0) {
@@ -445,7 +439,7 @@
               '</p>' +
               (order.isOversize ? '<span class="badge badge-oversize">⚠️ OVERSIZE / EXCEEDS IONIQ 5 CAPACITY</span>' : '') +
               '<div style="display:flex; gap:8px; margin-top:10px;">' +
-                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' + '<button type="button" class="btn btn-secondary" style="margin-top:0;color:#ef4444;border-color:#ef4444;padding:6px 10px;" onclick="delOrd(\'' + order.id + '\')">🗑️</button>' +
+                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' +
                 '<div style="flex:1;">' + actionButtons + '</div>' +
               '</div>' +
               thumbnailsHtml +
@@ -457,7 +451,6 @@
       });
     }
 
-    // --- 6. CAMERA COMPRESSION & TOUCH SIGNATURE ---
     window.handlePhotoCapture = function(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -576,19 +569,9 @@
       switchTab('screen-queue');
     };
 
-    window.delOrd = async function(orderId) {
-      if (!orderId) return;
-      if (!confirm("Delete this order permanently?")) return;
-      try {
-        await db.collection('orders').doc(orderId).delete();
-      } catch (err) {
-        alert("Error deleting order: " + err.message);
-      }
-    };
-
     window.addEventListener('DOMContentLoaded', () => {
       listenToDispatchQueue();
     });
   </script>
-<script src="trash.js"></script></body>
+</body>
 </html>
