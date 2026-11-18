@@ -42,7 +42,21 @@
     .screen { display: none; padding: 16px; max-width: 650px; margin: 0 auto; }
     .screen.active { display: block !important; }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
-    .upload-zone { border: 2px dashed var(--accent); border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 16px; background: rgba(56, 189, 248, 0.05); cursor: pointer; }
+    .upload-zone {
+      border: 2px dashed var(--accent);
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+      margin-bottom: 16px;
+      background: rgba(56, 189, 248, 0.05);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+    .upload-zone.drag-over {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #7dd3fc;
+      transform: scale(1.01);
+    }
     .upload-zone input { display: none; }
     label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
     input, textarea { width: 100%; padding: 10px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.95rem; }
@@ -85,8 +99,8 @@
   <section id="screen-intake" class="screen">
     <div class="card">
       <h2 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--accent);">Book Delivery Order</h2>
-      <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-        <strong>Upload Slip (PDF, XLSX, CSV)</strong>
+      <div id="dropZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <strong>Drag & Drop or Click to Upload Slip (PDF, XLSX, CSV)</strong>
         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--muted);">Auto-extracts PO#, Ship To / Shipper, & Dimensions</p>
         <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload(event)">
       </div>
@@ -237,8 +251,7 @@
       return isOver;
     };
 
-    window.handleFileUpload = async function(e) {
-      const file = e.target.files[0];
+    async function processUploadedFile(file) {
       if (!file) return;
       const nameLower = file.name.toLowerCase();
 
@@ -249,7 +262,7 @@
           pdfLib = resolvePdfLib();
         }
         if (!pdfLib) {
-          alert("PDF library is loading. Please tap Choose File again in 2 seconds.");
+          alert("PDF library is loading. Please try again in 2 seconds.");
           return;
         }
         if (!pdfLib.GlobalWorkerOptions.workerSrc) {
@@ -282,8 +295,55 @@
           }
         };
         reader.readAsArrayBuffer(file);
+      } else {
+        alert("Unsupported file type. Please drop a PDF, XLSX, XLS, or CSV file.");
       }
+    }
+
+    window.handleFileUpload = async function(e) {
+      const file = e.target.files[0];
+      await processUploadedFile(file);
+      e.target.value = '';
     };
+
+    // Drag-and-Drop Setup
+    function setupDragAndDrop() {
+      const dropZone = document.getElementById('dropZone');
+      if (!dropZone) return;
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+      });
+
+      // Prevent browser from opening dropped file if dropped slightly outside the box
+      ['dragover', 'drop'].forEach(eventName => {
+        window.addEventListener(eventName, (e) => {
+          e.preventDefault();
+        });
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.add('drag-over');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.remove('drag-over');
+        });
+      });
+
+      dropZone.addEventListener('drop', async (e) => {
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          await processUploadedFile(files[0]);
+        }
+      });
+    }
 
     function extractFieldsFromText(text, filename) {
       let invMatch = text.match(/Invoice\s*#?\s*([0-9]+(?:-[0-9]+)?)/i);
@@ -570,6 +630,7 @@
     };
 
     window.addEventListener('DOMContentLoaded', () => {
+      setupDragAndDrop();
       listenToDispatchQueue();
     });
   </script>
