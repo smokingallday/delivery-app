@@ -1,4 +1,3 @@
-cat << 'EOF' > ~/super-delivery/dispatch.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -586,4 +585,77 @@ cat << 'EOF' > ~/super-delivery/dispatch.html
           doc.setFont('helvetica', 'italic');
           doc.setFontSize(9);
           doc.setTextColor(100, 116, 139);
-          doc.text('Drop-off photo unavailable', 157, 213, { align
+          doc.text('Drop-off photo unavailable', 157, 213, { align: 'center' });
+        }
+      } else {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(148, 163, 184);
+        doc.text('Pending drop-off photo', 157, 213, { align: 'center' });
+      }
+
+      // Footer
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Borray Manufacturing • Dispatch & Proof of Delivery Record', 108, 270, { align: 'center' });
+
+      const cleanPO = (ord.poNumber || ord.id).replace(/[^a-zA-Z0-9_-]/g, '_');
+      if (previewOnly) {
+        window.open(doc.output('bloburl'), '_blank');
+      } else {
+        doc.save('Invoice_' + cleanPO + '.pdf');
+      }
+    };
+
+    // Batch Export All Active PO Invoices into a Single Multi-Page PDF
+    window.exportAllInvoicesPDF = function() {
+      if (!currentOrders || currentOrders.length === 0) {
+        alert("No active orders to export.");
+        return;
+      }
+      currentOrders.forEach(ord => {
+        window.generateInvoicePDF(ord.id, false);
+      });
+    };
+
+    window.delOrd = async function(id) {
+      if (!confirm("Move this order to trash?")) return;
+      await db.collection('orders').doc(id).delete();
+    };
+
+    window.exportManifestCSV = function() {
+      if (!currentOrders.length) return alert("No orders to export.");
+      const headers = ['PO_Number','Customer','Destination','Length','Width','Height','CubicFt','Status','Signer','DeliveredAt'];
+      const rows = currentOrders.map(o => [
+        '"' + (o.poNumber || '') + '"',
+        '"' + (o.customer || '').replace(/"/g, '""') + '"',
+        '"' + (o.destination || '').replace(/"/g, '""') + '"',
+        o.length || 0, o.width || 0, o.height || 0, o.cubicFt || 0,
+        '"' + (o.status || '') + '"',
+        '"' + (o.signerName || '') + '"',
+        '"' + (o.deliveredAt || '') + '"'
+      ].join(','));
+      const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Dispatch_Manifest_' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
+    };
+
+    window.clearCompletedDeliveries = async function() {
+      if (!confirm("Clear all delivered orders from the active fleet screen?")) return;
+      const batch = db.batch();
+      currentOrders.forEach(o => {
+        if (o.status === 'Delivered') {
+          batch.delete(db.collection('orders').doc(o.id));
+        }
+      });
+      await batch.commit();
+    };
+
+    window.addEventListener('DOMContentLoaded', listenToOrders);
+  </script>
+  <script src="trash.js"></script>
+</body>
+</html>
