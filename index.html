@@ -4,93 +4,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Delivery Command</title>
-
-  <!-- PWA Manifest & Meta -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
 
-  <!-- Core Libraries: Local first with CDN fallback -->
+  <!-- Local Offline Libraries + Firebase Compat SDK -->
   <script src="xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
-  <!-- Firebase Compat SDKs for Real-Time Cloud Sync -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <style>
     :root {
-      --bg: #0f172a; --card: #1e293b; --border: #334155; --accent: #38bdf8;
-      --primary: #2563eb; --success: #16a34a; --warning: #f59e0b; --danger: #ef4444;
-      --text: #f8fafc; --muted: #94a3b8;
+      --bg: #0f172a; --card: #1e293b; --border: #334155;
+      --accent: #38bdf8; --primary: #2563eb; --success: #16a34a;
+      --warning: #f59e0b; --danger: #ef4444; --text: #f8fafc; --muted: #94a3b8;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding-bottom: 80px; min-height: 100vh; }
-    header { background: #111827; padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 40; }
-    header h1 { font-size: 1.1rem; font-weight: 600; color: var(--text); }
-    header span { font-size: 0.8rem; color: var(--accent); }
-    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-    .toolbar button { flex: 1; padding: 10px; font-size: 0.85rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+    header { background: #111827; padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 40; }
+    header h1 { font-size: 1.05rem; font-weight: 700; }
+    header span { font-size: 0.78rem; color: var(--accent); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .toolbar button { flex: 1; min-width: 110px; padding: 9px 8px; font-size: 0.8rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
     .btn-export { background: #0284c7; color: #fff; border-color: var(--accent); }
+    .btn-restore { background: #1e3a8a; color: #93c5fd; }
     .btn-clear { background: #334155; color: #cbd5e1; }
     .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #111827; display: flex; border-top: 1px solid var(--border); z-index: 50; }
     .nav-btn { flex: 1; padding: 14px; text-align: center; color: var(--muted); font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; background: none; }
     .nav-btn.active { color: var(--accent); border-top: 2px solid var(--accent); }
-    .screen { display: none; padding: 16px; max-width: 650px; margin: 0 auto; }
-    .screen.active { display: block !important; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
-    .upload-zone {
-      border: 2px dashed var(--accent);
-      border-radius: 8px;
-      padding: 18px;
-      text-align: center;
-      margin-bottom: 16px;
-      background: rgba(56, 189, 248, 0.05);
-      cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-    }
-    .upload-zone.drag-over {
-      background: rgba(56, 189, 248, 0.2);
-      border-color: #7dd3fc;
-      transform: scale(1.01);
-    }
+    .screen { display: none; padding: 14px; max-width: 680px; margin: 0 auto; }
+    .screen.active { display: block; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+    .upload-zone { border: 2px dashed var(--accent); border-radius: 8px; padding: 14px; text-align: center; margin-bottom: 14px; background: rgba(56, 189, 248, 0.05); cursor: pointer; }
     .upload-zone input { display: none; }
-    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
-    input, textarea { width: 100%; padding: 10px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.95rem; }
+    label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
+    input, textarea { width: 100%; padding: 9px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; }
     input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .dims-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
     .badge-pending { background: #78350f; color: #fde68a; }
     .badge-intransit { background: #1e3a8a; color: #93c5fd; }
     .badge-delivered { background: #14532d; color: #86efac; }
     .badge-oversize { background: #7f1d1d; color: #fecaca; border: 1px solid var(--danger); margin-top: 6px; }
-    .alert { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-top: 10px; display: none; }
+    .alert { padding: 10px 12px; border-radius: 6px; font-size: 0.82rem; margin-top: 10px; display: none; }
     .alert-danger { background: rgba(220, 38, 38, 0.2); color: #fca5a5; border: 1px solid var(--danger); }
     .alert-success { background: rgba(22, 163, 74, 0.2); color: #86efac; border: 1px solid var(--success); }
-    .btn { display: block; width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-align: center; background: var(--accent); color: #0f172a; font-size: 0.95rem; }
+    .btn { display: block; width: 100%; padding: 11px; margin-top: 10px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; text-align: center; background: var(--accent); color: #0f172a; font-size: 0.9rem; }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-secondary { background: #334155; color: #fff; }
     .btn-success { background: var(--success); color: #fff; }
+    .btn-po { background: #0f766e; color: #ccfbf1; border: 1px solid #14b8a6; }
     canvas { background: #ffffff; border-radius: 6px; width: 100%; height: 150px; touch-action: none; cursor: crosshair; }
     .preview-img { max-width: 100%; max-height: 180px; border-radius: 6px; display: none; margin-top: 8px; border: 1px solid var(--border); }
-    .pod-thumbnails { display: flex; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
-    .pod-thumbnails img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: #000; }
+    .pod-thumbnails { display: flex; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); align-items: center; }
+    .pod-thumbnails img { width: 68px; height: 68px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: #000; }
   </style>
 </head>
 <body>
+
   <header>
     <h1>Delivery Command</h1>
-    <span>super-delivery • Cloud Sync</span>
+    <span id="syncStatus">● Live Sync</span>
   </header>
 
   <!-- Screen 1: Active Queue -->
   <section id="screen-queue" class="screen active">
     <div class="toolbar">
-      <button class="btn-export" onclick="exportDailyManifest()">📊 Export Daily Manifest</button>
-      <button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
+      <button class="btn-export" onclick="exportDailyManifest()">📊 Export & Email POs</button>
+      <button class="btn-restore" onclick="openRestoreModal()">↩️ Restore (<span id="trashCount">0</span>)</button>
+      <button class="btn-clear" onclick="clearCompletedDeliveries()">Archive Delivered</button>
     </div>
     <div id="orders-list"></div>
   </section>
@@ -98,54 +83,107 @@
   <!-- Screen 2: Intake Form -->
   <section id="screen-intake" class="screen">
     <div class="card">
-      <h2 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--accent);">Book Delivery Order</h2>
-      <div id="dropZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
-        <strong>Drag & Drop or Click to Upload Slip (PDF, XLSX, CSV)</strong>
-        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--muted);">Auto-extracts PO#, Ship To / Shipper, & Dimensions</p>
+      <h2 style="font-size: 1.05rem; margin-bottom: 10px; color: var(--accent);">Book Delivery / Packing Slip</h2>
+      <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <strong>Upload Borray Slip (PDF, XLSX, CSV)</strong>
+        <p style="margin: 4px 0 0; font-size: 0.78rem; color: var(--muted);">Auto-extracts Invoice #, PO #, Bill To, Ship To, Qty & Dims</p>
         <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload(event)">
       </div>
+
       <form id="deliveryForm" onsubmit="event.preventDefault(); handleAddOrder();">
-        <label>PO / Invoice Number</label>
-        <input type="text" id="poNumber" placeholder="PO-1001" required>
-        <label>Customer / Destination Name</label>
-        <input type="text" id="customerName" placeholder="Client Name" required>
-        <label>Delivery Address</label>
-        <input type="text" id="deliveryAddress" placeholder="Street, City, State, ZIP" required>
-        <label>Cargo Dimensions (Inches)</label>
+        <div class="grid-2">
+          <div>
+            <label>Invoice #</label>
+            <input type="text" id="invoiceNumber" placeholder="1798-201">
+          </div>
+          <div>
+            <label>P.O. Number</label>
+            <input type="text" id="poNumber" placeholder="ABEL-STATE FOODS" required>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label>Bill To (Customer)</label>
+            <input type="text" id="billTo" placeholder="OK PRODUCE, FRESNO, CA">
+          </div>
+          <div>
+            <label>Sales Rep</label>
+            <input type="text" id="salesRep" placeholder="Angela Borrayo">
+          </div>
+        </div>
+
+        <label>Ship To (Recipient / Store Name)</label>
+        <input type="text" id="customerName" placeholder="STATE FOOD MARKET - CARLOS" required>
+
+        <label>Ship To Address</label>
+        <input type="text" id="deliveryAddress" placeholder="335 W. Olive Ave, Madera, CA" required>
+
+        <div class="grid-2">
+          <div>
+            <label>Item / SKU Description</label>
+            <input type="text" id="itemCode" placeholder="BOXCOM-P4840G">
+          </div>
+          <div>
+            <label>Quantity (QTY)</label>
+            <input type="number" id="itemQty" value="1" min="1">
+          </div>
+        </div>
+
+        <label>Cargo Dimensions (Inches — IONIQ 5 Max: 68" × 41" × 26")</label>
         <div class="dims-grid">
           <input type="number" id="dimL" placeholder="L (68 max)" step="any" oninput="auditIoniqLimits()" required>
           <input type="number" id="dimW" placeholder="W (41 max)" step="any" oninput="auditIoniqLimits()" required>
           <input type="number" id="dimH" placeholder="H (26 max)" step="any" oninput="auditIoniqLimits()" required>
         </div>
+
         <div id="dimAlert" class="alert alert-danger">
           ⚠️ OVERSIZE / EXCEEDS IONIQ 5 CAPACITY (Max: 68"L × 41"W × 26"H, 59.3 cu ft)
         </div>
-        <label>Special Instructions / Notes</label>
-        <textarea id="itemsDesc" rows="2" placeholder="Gate codes, handling notes..."></textarea>
+
+        <label>Packing Slip Description & Approval Notes</label>
+        <textarea id="itemsDesc" rows="3" placeholder="CUSTOM PRINTABLE ABS SLEEVE BIN, approval notes..."></textarea>
+
         <button type="submit" class="btn">Save to Dispatch Queue</button>
       </form>
       <div id="intakeAlert" class="alert alert-success"></div>
     </div>
   </section>
 
-  <!-- Screen 3: Proof of Delivery (POD) Modal -->
+  <!-- Screen 3: Proof of Delivery (POD) -->
   <section id="screen-pod" class="screen">
     <div class="card">
-      <h2 style="font-size: 1.1rem; margin-bottom: 8px; color: var(--accent);">Proof of Delivery (POD)</h2>
+      <h2 style="font-size: 1.05rem; margin-bottom: 8px; color: var(--accent);">Proof of Delivery (POD)</h2>
       <div id="podOrderSummary" style="font-size: 0.85rem; color: var(--muted); margin-bottom: 12px;"></div>
-      <label>1. Photo of Delivered Cargo</label>
-      <button type="button" class="btn btn-secondary" onclick="document.getElementById('podPhoto').click()">📷 Take Photo</button>
+
+      <label>1. Photo of Delivered Cargo (Saves to Phone & Office PC)</label>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('podPhoto').click()">📷 Take POD Snapshot</button>
       <input type="file" id="podPhoto" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoCapture(event)">
       <img id="photoPreview" class="preview-img" alt="POD Preview" />
+
       <label>2. Customer Signature</label>
       <canvas id="sigCanvas"></canvas>
       <button type="button" class="btn btn-secondary" style="padding: 6px; font-size: 0.8rem;" onclick="clearSignature()">Clear Signature</button>
+
       <label>3. Received By (Print Name)</label>
       <input type="text" id="signerName" placeholder="Receiver Name">
+
       <button type="button" class="btn btn-success" onclick="finalizeDelivery()">Confirm & Finalize Delivery</button>
       <button type="button" class="btn btn-secondary" onclick="switchTab('screen-queue')">Cancel</button>
     </div>
   </section>
+
+  <!-- Restore Modal -->
+  <div id="restoreModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center; padding:15px;">
+    <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; max-width:500px; width:100%; max-height:80vh; display:flex; flex-direction:column; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0; font-size:1.05rem;">Recently Deleted Orders</h3>
+        <button onclick="closeRestoreModal()" style="background:transparent; border:none; color:#cbd5e1; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <div id="restoreList" style="overflow-y:auto; flex:1; margin-bottom:12px;"></div>
+      <button class="btn btn-secondary" onclick="closeRestoreModal()">Close</button>
+    </div>
+  </div>
 
   <!-- Bottom Navigation -->
   <nav class="nav-bar">
@@ -154,59 +192,145 @@
   </nav>
 
   <script>
+    // --- 1. FIREBASE CONFIGURATION ---
     const firebaseConfig = {
       apiKey: "AIzaSyCes7q2ekpluK_QBpcDPb6iaIxljDQZ5dY",
       authDomain: "borray-delivery-dispatch.firebaseapp.com",
       projectId: "borray-delivery-dispatch",
       storageBucket: "borray-delivery-dispatch.firebasestorage.app",
       messagingSenderId: "385282448736",
-      appId: "1:385282448736:web:a8e60e605c20c0a7229205",
-      measurementId: "G-N1TG2E7RMB"
+      appId: "1:385282448736:web:a8e60e605c20c0a7229205"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
-    db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-      console.warn("Firestore offline persistence notice:", err.code);
-    });
+    db.enablePersistence().catch(() => {});
 
     const IONIQ5_LIMITS = { maxL: 68, maxW: 41, maxH: 26, maxCuFt: 59.3 };
     let currentOrders = [];
     let activePodOrderId = null;
     let compressedPhotoData = null;
+    window.recentlyDeletedOrders = JSON.parse(localStorage.getItem("recently_deleted_deliveries") || "[]");
 
-    function resolvePdfLib() {
-      if (window.pdfjsLib) return window.pdfjsLib;
-      if (window['pdfjs-dist/build/pdf']) return window['pdfjs-dist/build/pdf'];
-      if (window.PDFJS) return window.PDFJS;
-      return null;
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js";
     }
 
+    function updateTrashCount() {
+      const el = document.getElementById("trashCount");
+      if (el) el.textContent = window.recentlyDeletedOrders.length;
+    }
+
+    // --- 2. NAVIGATION ---
     window.switchTab = function(screenId) {
       document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       const target = document.getElementById(screenId);
       if (target) target.classList.add('active');
-
-      if (screenId === 'screen-queue') {
-        const b = document.getElementById('btn-queue');
-        if (b) b.classList.add('active');
-      } else if (screenId === 'screen-intake') {
-        const b = document.getElementById('btn-intake');
-        if (b) b.classList.add('active');
-      }
+      if (screenId === 'screen-queue') document.getElementById('btn-queue')?.classList.add('active');
+      if (screenId === 'screen-intake') document.getElementById('btn-intake')?.classList.add('active');
     };
 
+    // --- 3. BORRAY MFG PACKING SLIP / PO GENERATOR ---
+    window.openBorrayPO = function(orderId) {
+      const ord = currentOrders.find(o => o.id === orderId);
+      if (!ord) return;
+      const dateStr = ord.deliveredAt ? new Date(ord.deliveredAt).toLocaleDateString() : new Date(ord.createdAt || Date.now()).toLocaleDateString();
+      const billToHtml = (ord.billTo || ord.customer || "").replace(/\n/g, "<br>");
+      const shipToHtml = (ord.customer + "<br>" + ord.destination).replace(/\n/g, "<br>");
+      const descHtml = ((ord.itemCode ? "<strong>" + ord.itemCode + "</strong><br>" : "") + (ord.notes || (ord.length + '" × ' + ord.width + '" × ' + ord.height + '"'))).replace(/\n/g, "<br>");
+
+      const podBlock = (ord.status === 'Delivered') ? `
+        <div style="margin-top:36px; border-top:1px solid #999; padding-top:14px; display:flex; justify-content:space-between; align-items:flex-end;">
+          <div>
+            <div style="font-size:11px; color:#555; text-transform:uppercase;">Received By</div>
+            <div style="font-size:15px; font-weight:bold; margin-top:4px;">${ord.signerName || 'N/A'}</div>
+            <div style="font-size:11px; color:#555; margin-top:2px;">Delivered: ${new Date(ord.deliveredAt).toLocaleString()}</div>
+          </div>
+          <div style="text-align:right;">
+            ${ord.signatureData ? `<img src="${ord.signatureData}" style="height:65px; border-bottom:1px solid #333;" />` : ''}
+            <div style="font-size:10px; color:#555;">Customer Signature</div>
+          </div>
+        </div>` : '';
+
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>Packing Slip - ${ord.poNumber || ord.invoiceNumber}</title>
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; color: #222; margin: 36px; line-height: 1.4; }
+        .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        .co-info { font-size: 12px; color: #333; }
+        .co-info strong { font-size: 14px; color: #000; }
+        .logo-box { display: flex; align-items: center; gap: 10px; }
+        .logo-circle { width: 54px; height: 54px; border-radius: 50%; border: 3px solid #c99a5b; display: flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-size: 32px; color: #8c6239; font-weight: bold; }
+        .logo-banner { background: #a3b86c; color: #8c6239; font-family: Georgia, serif; font-size: 28px; font-weight: bold; padding: 6px 22px; border-top: 3px dotted #d97b54; border-bottom: 3px dotted #d97b54; letter-spacing: 1px; }
+        .doc-title { font-size: 24px; color: #64748b; margin: 18px 0 14px; font-weight: normal; }
+        .addr-grid { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr; gap: 16px; font-size: 12px; margin-bottom: 22px; }
+        .lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: bold; margin-bottom: 3px; }
+        .meta-grid { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr; gap: 16px; font-size: 12px; margin-bottom: 18px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th { background: #e2e8f0; color: #475569; font-size: 11px; text-transform: uppercase; padding: 7px 8px; text-align: left; }
+        th.qty, td.qty { text-align: right; width: 80px; }
+        td { padding: 10px 8px; font-size: 12px; vertical-align: top; }
+        .no-print { margin-bottom: 18px; padding: 10px; background: #f1f5f9; border-radius: 6px; display: flex; gap: 10px; }
+        @media print { .no-print { display: none; } body { margin: 20px; } }
+      </style></head><body>
+      <div class="no-print">
+        <button onclick="window.print()" style="padding:8px 16px; background:#2563eb; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">🖨️ Print / Save as PDF</button>
+        <button onclick="window.close()" style="padding:8px 14px; background:#64748b; color:#fff; border:none; border-radius:5px; cursor:pointer;">Close</button>
+      </div>
+      <div class="top-row">
+        <div class="co-info">
+          <strong>Borray Mfg, Inc.</strong><br>
+          10620 PIONEER BLVD<br>
+          Santa Fe Springs, CA 90670<br>
+          USA<br>
+          7145580564<br>
+          info@borray.com<br>
+          http://www.borray.com
+        </div>
+        <div class="logo-box">
+          <div class="logo-circle">B</div>
+          <div class="logo-banner">Borray</div>
+        </div>
+      </div>
+      <div class="doc-title">Packing Slip</div>
+      <div class="addr-grid">
+        <div><div class="lbl">BILL TO</div>${billToHtml}</div>
+        <div><div class="lbl">SHIP TO</div>${shipToHtml}</div>
+        <div style="text-align:right;">
+          <div><span class="lbl">INVOICE #</span> ${ord.invoiceNumber || ord.poNumber}</div>
+          <div style="margin-top:4px;"><span class="lbl">DATE</span> ${dateStr}</div>
+        </div>
+      </div>
+      <div class="meta-grid">
+        <div><div class="lbl">P.O. NUMBER</div>${ord.poNumber || ''}</div>
+        <div><div class="lbl">SALES REP</div>${ord.salesRep || 'Angela Borrayo'}</div>
+        <div></div>
+      </div>
+      <table>
+        <thead><tr><th>DESCRIPTION</th><th class="qty">QTY</th></tr></thead>
+        <tbody><tr><td>${descHtml}</td><td class="qty">${ord.qty || 1}</td></tr></tbody>
+      </table>
+      ${podBlock}
+      </body></html>`);
+      win.document.close();
+    };
+
+    // --- 4. EXPORT MANIFEST (.XLSX) + EMAIL COMPLETED POs TO SGONZALEZ@BORRAYO.COM ---
     window.exportDailyManifest = function() {
       if (!currentOrders || currentOrders.length === 0) {
         alert("No orders in queue to export.");
         return;
       }
+      const today = new Date().toISOString().slice(0, 10);
+
+      // 1. Keep downloading Excel spreadsheet
       const rows = currentOrders.map(ord => ({
-        "PO / Invoice #": ord.poNumber,
-        "Customer": ord.customer,
+        "Invoice #": ord.invoiceNumber || "N/A",
+        "PO Number": ord.poNumber,
+        "Bill To": ord.billTo || "N/A",
+        "Ship To / Customer": ord.customer,
         "Destination Address": ord.destination,
+        "Qty": ord.qty || 1,
         "Dimensions": ord.length + '" × ' + ord.width + '" × ' + ord.height + '"',
         "Cubic Feet": ord.cubicFt,
         "Status": ord.status,
@@ -216,22 +340,78 @@
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Dispatch Manifest");
-      const today = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, "delivery-manifest-" + today + ".xlsx");
+
+      // 2. Email completed POs directly to sgonzalez@borrayo.com
+      const completed = currentOrders.filter(o => o.status === 'Delivered');
+      const poSummary = completed.map(o =>
+        `• PO: ${o.poNumber} | Inv: ${o.invoiceNumber || 'N/A'} | Ship To: ${o.customer} (${o.destination}) | Qty: ${o.qty || 1} | Signed By: ${o.signerName || 'N/A'} at ${o.deliveredAt ? new Date(o.deliveredAt).toLocaleTimeString() : ''}`
+      ).join('\n');
+
+      const subject = encodeURIComponent(`Completed Delivery POs & Packing Slips - ${today}`);
+      const body = encodeURIComponent(
+        `Hi,\n\nHere are the completed POs for ${today} (${completed.length} delivered):\n\n${poSummary || 'No deliveries completed yet.'}\n\n(Note: Excel manifest delivery-manifest-${today}.xlsx was also downloaded.)`
+      );
+      setTimeout(() => {
+        window.location.href = `mailto:sgonzalez@borrayo.com?subject=${subject}&body=${body}`;
+      }, 400);
+    };
+
+    // --- 5. DELETE & RESTORE ---
+    window.deleteSingleDelivery = async function(orderId) {
+      const ord = currentOrders.find(o => o.id === orderId);
+      if (!confirm("Delete " + (ord ? ord.poNumber : "this order") + " from active queue?")) return;
+      if (ord) {
+        window.recentlyDeletedOrders.push(ord);
+        localStorage.setItem("recently_deleted_deliveries", JSON.stringify(window.recentlyDeletedOrders));
+        updateTrashCount();
+      }
+      await db.collection("orders").doc(orderId).delete();
+    };
+
+    window.openRestoreModal = function() {
+      const modal = document.getElementById("restoreModal");
+      const list = document.getElementById("restoreList");
+      if (window.recentlyDeletedOrders.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:var(--muted); padding:15px;">No deleted deliveries.</p>';
+      } else {
+        list.innerHTML = window.recentlyDeletedOrders.map((ord, idx) =>
+          '<div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:10px; border-radius:6px; margin-bottom:8px;">' +
+            '<div><strong>' + (ord.poNumber || "PO") + '</strong> - ' + (ord.customer || "") + '</div>' +
+            '<button class="btn btn-primary" style="width:auto; padding:5px 10px; font-size:0.8rem; margin:0;" onclick="restoreDeliveryOrder(' + idx + ')">Spawn Back</button>' +
+          '</div>'
+        ).join('');
+      }
+      modal.style.display = "flex";
+    };
+
+    window.closeRestoreModal = function() {
+      document.getElementById("restoreModal").style.display = "none";
+    };
+
+    window.restoreDeliveryOrder = async function(index) {
+      const ord = window.recentlyDeletedOrders[index];
+      if (!ord) return;
+      const docId = ord.id || ("RESTORE_" + Date.now());
+      const data = { ...ord };
+      delete data.id;
+      await db.collection("orders").doc(docId).set(data);
+      window.recentlyDeletedOrders.splice(index, 1);
+      localStorage.setItem("recently_deleted_deliveries", JSON.stringify(window.recentlyDeletedOrders));
+      updateTrashCount();
+      openRestoreModal();
     };
 
     window.clearCompletedDeliveries = async function() {
-      if (!confirm("Archive all completed deliveries? This will clear them from the live queue.")) return;
+      if (!confirm("Clear all delivered orders from the live queue?")) return;
       const batch = db.batch();
       currentOrders.forEach(ord => {
-        if (ord.status === 'Delivered') {
-          const docRef = db.collection('orders').doc(ord.id);
-          batch.delete(docRef);
-        }
+        if (ord.status === 'Delivered') batch.delete(db.collection('orders').doc(ord.id));
       });
       await batch.commit();
     };
 
+    // --- 6. IONIQ 5 CARGO & BORRAY SLIP PARSER ---
     function checkIsOversize(l, w, h) {
       const cuFt = (l * w * h) / 1728;
       return (l > IONIQ5_LIMITS.maxL || w > IONIQ5_LIMITS.maxW || h > IONIQ5_LIMITS.maxH || cuFt > IONIQ5_LIMITS.maxCuFt);
@@ -242,166 +422,60 @@
       const w = parseFloat(document.getElementById('dimW').value) || 0;
       const h = parseFloat(document.getElementById('dimH').value) || 0;
       const alertBox = document.getElementById('dimAlert');
-      if (!l && !w && !h) {
-        alertBox.style.display = 'none';
-        return false;
-      }
+      if (!l && !w && !h) { alertBox.style.display = 'none'; return false; }
       const isOver = checkIsOversize(l, w, h);
       alertBox.style.display = isOver ? 'block' : 'none';
       return isOver;
     };
 
-    async function processUploadedFile(file) {
-      if (!file) return;
-      const nameLower = file.name.toLowerCase();
-
-      if (file.type === "application/pdf" || nameLower.endsWith('.pdf')) {
-        let pdfLib = resolvePdfLib();
-        if (!pdfLib) {
-          await new Promise(r => setTimeout(r, 300));
-          pdfLib = resolvePdfLib();
-        }
-        if (!pdfLib) {
-          alert("PDF library is loading. Please try again in 2 seconds.");
-          return;
-        }
-        if (!pdfLib.GlobalWorkerOptions.workerSrc) {
-          pdfLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js";
-        }
-        try {
-          const buf = await file.arrayBuffer();
-          const loadingTask = pdfLib.getDocument({ data: new Uint8Array(buf) });
-          const pdf = await loadingTask.promise;
-          let fullText = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            fullText += content.items.map(it => it.str).join(" ") + " ";
-          }
-          extractFieldsFromText(fullText, file.name);
-        } catch (err) {
-          alert("Error parsing PDF: " + err.message);
-        }
-      } else if (nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls') || nameLower.endsWith('.csv')) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          try {
-            const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            const txt = XLSX.utils.sheet_to_txt(ws);
-            extractFieldsFromText(txt, file.name);
-          } catch (err) {
-            alert("Error parsing spreadsheet: " + err.message);
-          }
-        };
-        reader.readAsArrayBuffer(file);
-      } else {
-        alert("Unsupported file type. Please drop a PDF, XLSX, XLS, or CSV file.");
-      }
-    }
-
     window.handleFileUpload = async function(e) {
       const file = e.target.files[0];
-      await processUploadedFile(file);
-      e.target.value = '';
+      if (!file) return;
+      const nameLower = file.name.toLowerCase();
+      if (file.type === "application/pdf" || nameLower.endsWith('.pdf')) {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(new Uint8Array(buf)).promise;
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          fullText += content.items.map(it => it.str).join(" ") + " ";
+        }
+        extractFieldsFromText(fullText, file.name);
+      } else {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+          const txt = XLSX.utils.sheet_to_txt(wb.Sheets[wb.SheetNames[0]]);
+          extractFieldsFromText(txt, file.name);
+        };
+        reader.readAsArrayBuffer(file);
+      }
     };
 
-    // Drag-and-Drop Setup
-    function setupDragAndDrop() {
-      const dropZone = document.getElementById('dropZone');
-      if (!dropZone) return;
-
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        });
-      });
-
-      // Prevent browser from opening dropped file if dropped slightly outside the box
-      ['dragover', 'drop'].forEach(eventName => {
-        window.addEventListener(eventName, (e) => {
-          e.preventDefault();
-        });
-      });
-
-      ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-          dropZone.classList.add('drag-over');
-        });
-      });
-
-      ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-          dropZone.classList.remove('drag-over');
-        });
-      });
-
-      dropZone.addEventListener('drop', async (e) => {
-        const files = e.dataTransfer?.files;
-        if (files && files.length > 0) {
-          await processUploadedFile(files[0]);
-        }
-      });
-    }
-
     function extractFieldsFromText(text, filename) {
-      let invMatch = text.match(/Invoice\s*#?\s*([0-9]+(?:-[0-9]+)?)/i);
-      let poMatch = text.match(/(?:P\.O\.?\s*NUMBER|PO|P\.O\.|Order)[\s#:*-]+([A-Za-z0-9-]+)/i);
-      let finalPO = '';
-      if (invMatch) {
-        finalPO = invMatch[1].trim();
-      } else if (poMatch && poMatch[1].trim().toUpperCase() !== 'NUMBER') {
-        finalPO = poMatch[1].trim();
-      } else {
-        const fnMatch = filename.match(/^([0-9]{5,})/);
-        finalPO = fnMatch ? fnMatch[1] : 'PO-' + Date.now().toString().slice(-6);
-      }
+      const invMatch = text.match(/INVOICE\s*#?\s*([0-9]+-[0-9]+|[0-9]+)/i);
+      const poMatch = text.match(/P\.O\.?\s*NUMBER\s*([A-Za-z0-9\s-]+?)(?=\s+SALES\s+REP|\s+DESCRIPTION|$)/i);
+      const repMatch = text.match(/SALES\s+REP\s*([A-Za-z\s]+?)(?=\s+DESCRIPTION|\s+QTY|$)/i);
+      const billMatch = text.match(/BILL\s+TO\s*([A-Za-z0-9\s,\.\-#]+?)(?=\s+SHIP\s+TO|\s+INVOICE|$)/i);
+      const shipMatch = text.match(/SHIP\s+TO\s*([A-Za-z0-9\s,\.\-#]+?)(?=\s+INVOICE|\s+P\.O\.|$)/i);
+      const dimMatch = text.match(/(\d+(?:\.\d+)?)\s*["”]?\s*[xX*]\s*(\d+(?:\.\d+)?)\s*["”]?\s*(?:[xX*]\s*(\d+(?:\.\d+)?))?/i);
 
-      let customerName = '';
-      let deliveryAddress = '';
-
-      // Extract from SHIP TO or SHIPPER block instead of BILL TO
-      const shipMatch = text.match(/(?:SHIP\s*TO|SHIPPER)[\s:]+([\s\S]+?)(?=\s+BILL\s*TO|\s+DATE|\s+PLEASE\s+PAY|\s+DUE\s+DATE|\s+P\.O|\s+INVOICE|\s+CUSTOM|\s+QTY|$)/i);
+      document.getElementById('invoiceNumber').value = invMatch ? invMatch[1].trim() : '';
+      document.getElementById('poNumber').value = poMatch ? poMatch[1].trim() : (invMatch ? invMatch[1].trim() : 'PO-' + Date.now().toString().slice(-5));
+      if (repMatch) document.getElementById('salesRep').value = repMatch[1].trim();
+      if (billMatch) document.getElementById('billTo').value = billMatch[1].trim();
       if (shipMatch) {
-        let block = shipMatch[1].trim();
-        const addrRegex = /([0-9]+\s+[A-Za-z0-9\s,\.#-]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|BOULEVARD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PKWY|PARKWAY|HWY|HIGHWAY)[\s\S]*?[0-9]{5}(?:-[0-9]{4})?)/i;
-        const addrFound = block.match(addrRegex);
-
-        if (addrFound) {
-          deliveryAddress = addrFound[1].replace(/\s+/g, ' ').trim();
-          let beforeAddr = block.substring(0, addrFound.index).trim();
-          customerName = beforeAddr.replace(/\s+/g, ' ').trim();
-        } else {
-          let parts = block.split(/\s{2,}/);
-          customerName = parts[0] || '';
-          deliveryAddress = parts.slice(1).join(' ').trim();
-        }
+        const shipClean = shipMatch[1].trim();
+        document.getElementById('customerName').value = shipClean;
+        document.getElementById('deliveryAddress').value = shipClean;
       }
-
-      if (!deliveryAddress) {
-        const fallbackAddr = text.match(/([0-9]+\s+[A-Za-z0-9\s,\.#-]+?(?:ROAD|RD|STREET|ST|AVE|AVENUE|BLVD|DR|LN|WAY)[\s\S]*?[0-9]{5})/i);
-        if (fallbackAddr) deliveryAddress = fallbackAddr[1].replace(/\s+/g, ' ').trim();
+      if (dimMatch) {
+        document.getElementById('dimL').value = dimMatch[1];
+        document.getElementById('dimW').value = dimMatch[2];
+        document.getElementById('dimH').value = dimMatch[3] || 12;
       }
-
-      let dimL = '', dimW = '', dimH = '';
-      const dim3D = text.match(/(\d+(?:\.\d+)?)\s*["”]?\s*[xX*by\s]+\s*(\d+(?:\.\d+)?)\s*["”]?\s*[xX*by\s]+\s*(\d+(?:\.\d+)?)/i);
-      const dim2D = text.match(/(\d+(?:\.\d+)?)\s*["”]?\s*[xX*by\s]+\s*(\d+(?:\.\d+)?)\s*["”]?/i);
-
-      if (dim3D) {
-        dimL = dim3D[1]; dimW = dim3D[2]; dimH = dim3D[3];
-      } else if (dim2D) {
-        dimL = dim2D[1]; dimW = dim2D[2]; dimH = '12';
-      }
-
-      if (document.getElementById('poNumber')) document.getElementById('poNumber').value = finalPO;
-      if (document.getElementById('customerName')) document.getElementById('customerName').value = customerName;
-      if (document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = deliveryAddress;
-      if (document.getElementById('dimL')) document.getElementById('dimL').value = dimL;
-      if (document.getElementById('dimW')) document.getElementById('dimW').value = dimW;
-      if (document.getElementById('dimH')) document.getElementById('dimH').value = dimH;
-
-      document.getElementById('itemsDesc').value = "Auto-filled from: " + filename;
+      document.getElementById('itemsDesc').value = "Extracted from: " + filename;
       auditIoniqLimits();
     }
 
@@ -409,108 +483,80 @@
       const l = parseFloat(document.getElementById('dimL').value) || 0;
       const w = parseFloat(document.getElementById('dimW').value) || 0;
       const h = parseFloat(document.getElementById('dimH').value) || 0;
-      const cuFt = ((l * w * h) / 1728).toFixed(1);
-      const orderId = 'ord_' + Date.now();
-
       const newOrder = {
-        id: orderId,
+        invoiceNumber: document.getElementById('invoiceNumber').value.trim(),
         poNumber: document.getElementById('poNumber').value.trim(),
+        billTo: document.getElementById('billTo').value.trim(),
+        salesRep: document.getElementById('salesRep').value.trim() || 'Angela Borrayo',
         customer: document.getElementById('customerName').value.trim(),
         destination: document.getElementById('deliveryAddress').value.trim(),
-        length: l,
-        width: w,
-        height: h,
-        cubicFt: cuFt,
+        itemCode: document.getElementById('itemCode').value.trim(),
+        qty: parseInt(document.getElementById('itemQty').value) || 1,
+        length: l, width: w, height: h,
+        cubicFt: ((l * w * h) / 1728).toFixed(1),
         isOversize: checkIsOversize(l, w, h),
         status: 'Pending',
-        photoData: null,
-        signatureData: null,
-        signerName: '',
-        deliveredAt: null,
+        photoData: null, signatureData: null, signerName: '', deliveredAt: null,
         notes: document.getElementById('itemsDesc').value.trim(),
         createdAt: new Date().toISOString()
       };
-
-      await db.collection('orders').doc(orderId).set(newOrder);
-
+      await db.collection('orders').add(newOrder);
       document.getElementById('deliveryForm').reset();
       document.getElementById('dimAlert').style.display = 'none';
-
-      const alertBox = document.getElementById('intakeAlert');
-      alertBox.textContent = "Order " + newOrder.poNumber + " synced to dispatch queue.";
-      alertBox.style.display = 'block';
-
-      setTimeout(() => {
-        alertBox.style.display = 'none';
-        switchTab('screen-queue');
-      }, 500);
+      switchTab('screen-queue');
     };
 
+    // --- 7. REALTIME QUEUE RENDER ---
     window.updateOrderStatus = async function(orderId, newStatus) {
       await db.collection('orders').doc(orderId).update({ status: newStatus });
     };
 
-    function listenToDispatchQueue() {
-      db.collection('orders').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
-        currentOrders = [];
-        snapshot.forEach(doc => currentOrders.push(doc.data()));
-
+    function startLiveSync() {
+      db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        currentOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const listEl = document.getElementById('orders-list');
-        if (!currentOrders || currentOrders.length === 0) {
-          listEl.innerHTML = '<div class="card" style="text-align: center; color: var(--muted);">No orders in queue yet. Tap "+ Add Intake" to log one.</div>';
+        if (currentOrders.length === 0) {
+          listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted);">No orders in queue yet. Tap "+ Add Intake" to log one.</div>';
           return;
         }
-
         listEl.innerHTML = currentOrders.map(order => {
-          let actionButtons = '';
-          const normalizedStatus = order.status.replace(/\s+/g, '').toLowerCase();
+          const norm = order.status.replace(/\s+/g, '').toLowerCase();
+          let actionBtn = '';
+          if (order.status === 'Pending') actionBtn = '<button class="btn btn-primary" style="margin-top:0;" onclick="updateOrderStatus(\'' + order.id + '\', \'In Transit\')">Start Run</button>';
+          else if (order.status === 'In Transit') actionBtn = '<button class="btn btn-success" style="margin-top:0;" onclick="openPodModal(\'' + order.id + '\')">POD Sign-off</button>';
+          else actionBtn = '<button class="btn btn-secondary" style="margin-top:0;" disabled>Delivered ✓</button>';
 
-          if (order.status === 'Pending') {
-            actionButtons = '<button class="btn btn-primary" onclick="updateOrderStatus(\'' + order.id + '\', \'In Transit\')">Start Run</button>';
-          } else if (order.status === 'In Transit') {
-            actionButtons = '<button class="btn btn-success" onclick="openPodModal(\'' + order.id + '\')">POD Sign-off</button>';
-          } else if (order.status === 'Delivered') {
-            actionButtons = '<button class="btn btn-secondary" disabled style="cursor:default;">Delivered ✓</button>';
-          }
-
-          let thumbnailsHtml = '';
+          let thumbs = '';
           if (order.status === 'Delivered' && (order.photoData || order.signatureData)) {
-            thumbnailsHtml = 
-              '<div class="pod-thumbnails">' +
-                (order.photoData ? '<img src="' + order.photoData + '" alt="POD Photo" />' : '') +
-                (order.signatureData ? '<img src="' + order.signatureData + '" alt="Signature" style="background:#fff;" />' : '') +
-                '<div style="font-size:0.75rem; color:var(--muted); align-self:center;">' +
-                  'Signed by: <strong>' + (order.signerName || 'N/A') + '</strong><br>' +
-                  new Date(order.deliveredAt).toLocaleTimeString() +
-                '</div>' +
-              '</div>';
+            thumbs = '<div class="pod-thumbnails">' +
+              (order.photoData ? '<img src="' + order.photoData + '" />' : '') +
+              (order.signatureData ? '<img src="' + order.signatureData + '" style="background:#fff;" />' : '') +
+              '<div style="font-size:0.75rem; color:var(--muted);">Signed: <strong>' + (order.signerName || 'N/A') + '</strong><br>' + new Date(order.deliveredAt).toLocaleTimeString() + '</div>' +
+            '</div>';
           }
 
-          return (
-            '<div class="card">' +
-              '<div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:6px;">' +
-                '<strong style="font-size:1.05rem;">' + order.poNumber + '</strong>' +
-                '<span class="badge badge-' + normalizedStatus + '">' + order.status + '</span>' +
-              '</div>' +
-              '<div style="color:var(--accent); font-weight:500; font-size:0.9rem;">' + order.customer + '</div>' +
-              '<p style="font-size:0.85rem; color:var(--text); margin-top:4px;">📍 ' + order.destination + '</p>' +
-              '<p style="font-size:0.8rem; color:var(--muted); margin-top:4px;">' +
-                order.length + '"L × ' + order.width + '"W × ' + order.height + '"H (' + order.cubicFt + ' cu ft)' +
-              '</p>' +
-              (order.isOversize ? '<span class="badge badge-oversize">⚠️ OVERSIZE / EXCEEDS IONIQ 5 CAPACITY</span>' : '') +
-              '<div style="display:flex; gap:8px; margin-top:10px;">' +
-                '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; text-decoration:none;">Navigate</a>' +
-                '<div style="flex:1;">' + actionButtons + '</div>' +
-              '</div>' +
-              thumbnailsHtml +
-            '</div>'
-          );
+          return '<div class="card">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+              '<strong style="font-size:1.05rem;">' + order.poNumber + (order.invoiceNumber ? ' <small style="color:var(--muted);">(Inv #' + order.invoiceNumber + ')</small>' : '') + '</strong>' +
+              '<span class="badge badge-' + norm + '">' + order.status + '</span>' +
+            '</div>' +
+            '<div style="color:var(--accent); font-weight:600; font-size:0.9rem;">' + order.customer + '</div>' +
+            '<p style="font-size:0.84rem; margin-top:4px;">📍 ' + order.destination + '</p>' +
+            '<p style="font-size:0.78rem; color:var(--muted); margin-top:4px;">Qty: ' + (order.qty || 1) + ' • ' + order.length + '"×' + order.width + '"×' + order.height + '" (' + order.cubicFt + ' cu ft)</p>' +
+            (order.isOversize ? '<span class="badge badge-oversize">⚠️ OVERSIZE / EXCEEDS IONIQ 5</span>' : '') +
+            '<div style="display:flex; gap:6px; margin-top:10px;">' +
+              '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(order.destination) + '" target="_blank" class="btn btn-secondary" style="margin-top:0; width:auto; padding:10px 12px; text-decoration:none;">🗺️</a>' +
+              '<button type="button" class="btn btn-po" style="margin-top:0; width:auto; padding:10px 12px;" onclick="openBorrayPO(\'' + order.id + '\')">🖨️ PO</button>' +
+              '<div style="flex:1;">' + actionBtn + '</div>' +
+              '<button type="button" class="btn btn-secondary" style="margin-top:0; width:auto; padding:10px 12px; color:#ef4444; border:1px solid #ef4444;" onclick="deleteSingleDelivery(\'' + order.id + '\')">🗑️</button>' +
+            '</div>' +
+            thumbs +
+          '</div>';
         }).join('');
-      }, (error) => {
-        console.error("Firestore sync error:", error);
       });
     }
 
+    // --- 8. POD CAMERA (LOCAL SAVE ON PHONE + CLOUD SYNC) & SIGNATURE ---
     window.handlePhotoCapture = function(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -519,17 +565,10 @@
         const img = new Image();
         img.onload = function() {
           const c = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxW = 800;
-          if (width > maxW) {
-            height = Math.round((height * maxW) / width);
-            width = maxW;
-          }
-          c.width = width;
-          c.height = height;
-          const cx = c.getContext('2d');
-          cx.drawImage(img, 0, 0, width, height);
+          let w = img.width, h = img.height, maxW = 800;
+          if (w > maxW) { h = Math.round((h * maxW) / w); w = maxW; }
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
           compressedPhotoData = c.toDataURL('image/jpeg', 0.70);
           const preview = document.getElementById('photoPreview');
           preview.src = compressedPhotoData;
@@ -546,16 +585,10 @@
 
     function resizeCanvas() {
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = '#000000';
+      canvas.width = rect.width; canvas.height = rect.height;
+      ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.strokeStyle = '#000000';
     }
-
-    window.clearSignature = function() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
+    window.clearSignature = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     function getCoords(e) {
       const rect = canvas.getBoundingClientRect();
@@ -563,37 +596,11 @@
       const cy = e.touches ? e.touches[0].clientY : e.clientY;
       return { x: cx - rect.left, y: cy - rect.top };
     }
-
-    canvas.addEventListener('mousedown', (e) => {
-      isDrawing = true;
-      const coords = getCoords(e);
-      ctx.beginPath();
-      ctx.moveTo(coords.x, coords.y);
-    });
-    canvas.addEventListener('mousemove', (e) => {
-      if (!isDrawing) return;
-      const coords = getCoords(e);
-      ctx.lineTo(coords.x, coords.y);
-      ctx.stroke();
-    });
+    canvas.addEventListener('mousedown', e => { isDrawing = true; const p = getCoords(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+    canvas.addEventListener('mousemove', e => { if (!isDrawing) return; const p = getCoords(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
     ['mouseup', 'mouseleave'].forEach(ev => canvas.addEventListener(ev, () => isDrawing = false));
-
-    canvas.addEventListener('touchstart', (e) => {
-      isDrawing = true;
-      const coords = getCoords(e);
-      ctx.beginPath();
-      ctx.moveTo(coords.x, coords.y);
-      e.preventDefault();
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-      if (!isDrawing) return;
-      const coords = getCoords(e);
-      ctx.lineTo(coords.x, coords.y);
-      ctx.stroke();
-      e.preventDefault();
-    }, { passive: false });
-
+    canvas.addEventListener('touchstart', e => { isDrawing = true; const p = getCoords(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); }, { passive: false });
+    canvas.addEventListener('touchmove', e => { if (!isDrawing) return; const p = getCoords(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); }, { passive: false });
     canvas.addEventListener('touchend', () => isDrawing = false);
 
     window.openPodModal = function(orderId) {
@@ -602,22 +609,29 @@
       document.getElementById('photoPreview').style.display = 'none';
       document.getElementById('signerName').value = '';
       clearSignature();
-      const order = currentOrders.find(o => o.id === orderId);
-      if (order) {
-        document.getElementById('podOrderSummary').innerHTML = 
-          '<strong>PO:</strong> ' + order.poNumber + ' — ' + order.customer + '<br>' +
-          '📍 ' + order.destination;
-      }
+      const ord = currentOrders.find(o => o.id === orderId);
+      if (ord) document.getElementById('podOrderSummary').innerHTML = '<strong>PO:</strong> ' + ord.poNumber + ' — ' + ord.customer;
       switchTab('screen-pod');
       setTimeout(resizeCanvas, 60);
     };
 
     window.finalizeDelivery = async function() {
       const signer = document.getElementById('signerName').value.trim();
-      if (!signer) {
-        alert("Please enter receiver name.");
-        return;
+      if (!signer) { alert("Please enter receiver name."); return; }
+
+      const ord = currentOrders.find(o => o.id === activePodOrderId);
+
+      // Save local copy directly to your phone
+      if (compressedPhotoData) {
+        const a = document.createElement('a');
+        a.href = compressedPhotoData;
+        a.download = `POD_${(ord && ord.poNumber) ? ord.poNumber.replace(/[^a-z0-9]/gi, '_') : activePodOrderId}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
+
+      // Sync to Firestore so the office computer receives it & saves locally too
       await db.collection('orders').doc(activePodOrderId).update({
         status: 'Delivered',
         signerName: signer,
@@ -625,13 +639,14 @@
         signatureData: canvas.toDataURL('image/png'),
         deliveredAt: new Date().toISOString()
       });
+
       activePodOrderId = null;
       switchTab('screen-queue');
     };
 
     window.addEventListener('DOMContentLoaded', () => {
-      setupDragAndDrop();
-      listenToDispatchQueue();
+      updateTrashCount();
+      startLiveSync();
     });
   </script>
 </body>
