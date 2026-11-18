@@ -1,3 +1,4 @@
+cat << 'EOF' > ~/super-delivery/dispatch.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <!-- Firebase Cloud Sync -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -96,8 +98,9 @@
       transition: filter 0.2s;
     }
     .btn:hover { filter: brightness(1.1); }
-    .btn-export { background: #0284c7; color: #fff; width: auto; padding: 8px 16px; margin: 0; }
-    .btn-clear { background: #334155; color: #cbd5e1; width: auto; padding: 8px 16px; margin: 0; }
+    .btn-export { background: #0284c7; color: #fff; width: auto; padding: 8px 16px; margin: 0; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    .btn-pdf-all { background: #16a34a; color: #fff; width: auto; padding: 8px 16px; margin: 0; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    .btn-clear { background: #334155; color: #cbd5e1; width: auto; padding: 8px 16px; margin: 0; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
 
     .alert { padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-top: 12px; display: none; }
     .alert-danger { background: rgba(220, 38, 38, 0.2); color: #fca5a5; border: 1px solid var(--danger); }
@@ -105,9 +108,9 @@
 
     /* Right Panel: Live Fleet Queue */
     .content-queue { padding: 24px 32px; overflow-y: auto; }
-    .queue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .queue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
     .queue-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
-    .toolbar { display: flex; gap: 10px; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
 
     .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
     .order-card {
@@ -135,6 +138,24 @@
       align-items: center;
     }
     .pod-box img { width: 55px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); }
+
+    .card-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .btn-sm {
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-preview { background: #0f172a; color: #38bdf8; border: 1px solid #38bdf8; }
+    .btn-download-pdf { background: #14532d; color: #86efac; border: 1px solid #16a34a; }
+    .btn-delete { background: #7f1d1d; color: #fecaca; border: 1px solid #ef4444; }
   </style>
 </head>
 <body>
@@ -191,7 +212,9 @@
         </div>
         <div class="toolbar">
           <button class="btn-export" onclick="exportDailyManifest()">📊 Export Manifest</button>
-          <button class="btn-clear" style="background:#1e3a8a;color:#93c5fd;" onclick="openRestore()">↩️ Restore (<span id="tCnt">0</span>)</button><button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
+          <button class="btn-pdf-all" onclick="exportAllInvoicesPDF()">📄 Download PO Invoices (PDF)</button>
+          <button class="btn-clear" style="background:#1e3a8a;color:#93c5fd;" onclick="openRestore()">↩️ Restore (<span id="tCnt">0</span>)</button>
+          <button class="btn-clear" onclick="clearCompletedDeliveries()">🗑️ Clear Completed</button>
         </div>
       </div>
 
@@ -415,8 +438,10 @@
                 (ord.notes ? '<p style="font-size:0.8rem; color:var(--muted); margin-top:6px; font-style:italic;">Notes: ' + ord.notes + '</p>' : '') +
               '</div>' +
               podSection +
-              '<div style="margin-top:10px;text-align:right;">' +
-                '<button type="button" style="background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;padding:5px 10px;border-radius:5px;font-size:0.75rem;cursor:pointer;" onclick="delOrd(\'' + ord.id + '\')">🗑️ Delete</button>' +
+              '<div class="card-actions">' +
+                '<button type="button" class="btn-sm btn-preview" onclick="generateInvoicePDF(\'' + ord.id + '\', true)">👁️ Preview PDF</button>' +
+                '<button type="button" class="btn-sm btn-download-pdf" onclick="generateInvoicePDF(\'' + ord.id + '\', false)">⬇️ Save PDF</button>' +
+                '<button type="button" class="btn-sm btn-delete" onclick="delOrd(\'' + ord.id + '\')">🗑️ Delete</button>' +
               '</div>' +
             '</div>'
           );
@@ -424,40 +449,141 @@
       });
     }
 
-    // Manifest Download
-    window.exportDailyManifest = function() {
-      if (!currentOrders.length) {
-        alert("No orders to export.");
+    function detectImageFormat(dataUrl) {
+      if (!dataUrl || typeof dataUrl !== 'string') return 'PNG';
+      if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+      return 'PNG';
+    }
+
+    // Per-PO PDF Invoice Generator (Signature Bottom-Left, Drop-Off Photo Bottom-Right)
+    window.generateInvoicePDF = function(orderId, previewOnly = false) {
+      const ord = currentOrders.find(o => o.id === orderId);
+      if (!ord) {
+        alert("Order not found.");
         return;
       }
-      const rows = currentOrders.map(o => ({
-        "PO / Invoice #": o.poNumber,
-        "Customer": o.customer,
-        "Destination Address": o.destination,
-        "Dimensions": o.length + '" × ' + o.width + '" × ' + o.height + '"',
-        "Cubic Feet": o.cubicFt,
-        "Status": o.status,
-        "Signer Name": o.signerName || "N/A",
-        "Delivered Timestamp": o.deliveredAt ? new Date(o.deliveredAt).toLocaleString() : "N/A"
-      }));
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Dispatch Manifest");
-      XLSX.writeFile(wb, "dispatch-manifest-" + new Date().toISOString().slice(0, 10) + ".xlsx");
-    };
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert("PDF generator is still loading. Please try again in a moment.");
+        return;
+      }
 
-    window.clearCompletedDeliveries = async function() {
-      if (!confirm("Clear all delivered orders from the active fleet screen?")) return;
-      const batch = db.batch();
-      currentOrders.forEach(o => {
-        if (o.status === 'Delivered') {
-          batch.delete(db.collection('orders').doc(o.id));
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'letter' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Borray Mfg, Inc.', 15, 20);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text('10620 Pioneer Blvd, Santa Fe Springs, CA 90670', 15, 26);
+      doc.text('(714) 558-0564  |  info@borray.com  |  www.borray.com', 15, 31);
+
+      doc.setFillColor(15, 23, 42);
+      doc.rect(132, 13, 69, 24, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(56, 189, 248);
+      doc.text('DELIVERY INVOICE / POD', 166.5, 20, { align: 'center' });
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text('PO / Inv #: ' + (ord.poNumber || 'N/A'), 166.5, 27, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text('Status: ' + (ord.status || 'Pending'), 166.5, 33, { align: 'center' });
+
+      doc.setDrawColor(203, 213, 225);
+      doc.line(15, 42, 201, 42);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text('SHIP TO / CUSTOMER', 15, 51);
+      doc.text('DELIVERY SUMMARY', 120, 51);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
+      const custLines = doc.splitTextToSize(ord.customer || 'N/A', 95);
+      doc.text(custLines, 15, 58);
+
+      const destLines = doc.splitTextToSize(ord.destination || 'N/A', 95);
+      doc.text(destLines, 15, 58 + custLines.length * 5 + 1);
+
+      const dateStr = ord.deliveredAt
+        ? new Date(ord.deliveredAt).toLocaleString()
+        : (ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : new Date().toLocaleDateString());
+      doc.text('Date: ' + dateStr, 120, 58);
+      doc.text('Vehicle: 2022 Hyundai IONIQ 5', 120, 64);
+      doc.text('Dimensions: ' + ord.length + '"L x ' + ord.width + '"W x ' + ord.height + '"H', 120, 70);
+      doc.text('Volume: ' + ord.cubicFt + ' cu ft' + (ord.isOversize ? ' (OVERSIZE)' : ''), 120, 76);
+
+      doc.setFillColor(241, 245, 249);
+      doc.rect(15, 92, 186, 9, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('PO / INVOICE #', 18, 98);
+      doc.text('CARGO & DELIVERY NOTES', 62, 98);
+      doc.text('DIMENSIONS', 162, 98);
+
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(15, 92, 186, 65);
+      doc.line(15, 101, 201, 101);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
+      doc.text(String(ord.poNumber || 'N/A'), 18, 109);
+      const notesLines = doc.splitTextToSize(ord.notes || 'Standard delivery', 94);
+      doc.text(notesLines, 62, 109);
+      doc.text(ord.length + '" x ' + ord.width + '" x ' + ord.height + '"', 162, 109);
+
+      // Bottom-Left: Customer Signature
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('CUSTOMER SIGNATURE', 15, 186);
+      doc.setDrawColor(148, 163, 184);
+      doc.rect(15, 189, 88, 46);
+
+      if (ord.signatureData) {
+        try {
+          doc.addImage(ord.signatureData, detectImageFormat(ord.signatureData), 18, 192, 82, 40, undefined, 'FAST');
+        } catch (err) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(9);
+          doc.setTextColor(100, 116, 139);
+          doc.text('Signature image unavailable', 59, 213, { align: 'center' });
         }
-      });
-      await batch.commit();
-    };
+      } else {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(148, 163, 184);
+        doc.text('Pending customer signature', 59, 213, { align: 'center' });
+      }
 
-    window.addEventListener('DOMContentLoaded', listenToOrders);
-  </script>
-<script src="trash.js"></script></body>
-</html>
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      doc.text('Signed By: ' + (ord.signerName || '________________________'), 15, 242);
+      doc.text('Timestamp: ' + (ord.deliveredAt ? new Date(ord.deliveredAt).toLocaleString() : 'Pending'), 15, 248);
+
+      // Bottom-Right: Drop-Off Photo
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('DROP-OFF PHOTO', 113, 186);
+      doc.setDrawColor(148, 163, 184);
+      doc.rect(113, 189, 88, 46);
+
+      if (ord.photoData) {
+        try {
+          doc.addImage(ord.photoData, detectImageFormat(ord.photoData), 116, 192, 82, 40, undefined, 'FAST');
+        } catch (err) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(9);
+          doc.setTextColor(100, 116, 139);
+          doc.text('Drop-off photo unavailable', 157, 213, { align
